@@ -20,5 +20,5 @@
 * 最後用 `torch.norm()` 算出這個誤差向量的長度。
 
 ### 疑問：
-1. 我該如何確定超大矩陣的答案是否有誤？亂數問題跟浮點數捨入誤差好像都會影響？老師可以提供一些想法嗎，因為前面幾個測試應該可以驗證高斯消去法等應該是對的，但l2 norm卻很大。
-3. `gauss.py` 的註解 # Set zero thresh (if entry is larger than this value, treat it as zero. Otherwise, treat it as nonzero) 是寫錯了？
+1. 在超大矩陣的測試下，l2 norm 數值很大，認為應該是浮點數誤差？
+3. `gauss.py` 的註解 `# Set zero thresh (if entry is larger than this value, treat it as zero. Otherwise, treat it as nonzero)` 是寫錯了？
