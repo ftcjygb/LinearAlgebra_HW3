@@ -90,7 +90,7 @@ def gauss_elimination(A):
                 factor = -R[i, pivot_col] / R[pivot_row, pivot_col]
                 R = row_addition(R, pivot_row, i, factor.item())
                 
-                #R[i, pivot_col] = 0.0
+                R[i, pivot_col] = 0.0 #
 
         pivot_row += 1
         pivot_col += 1
@@ -122,4 +122,5 @@ def gauss_elimination(A):
                     factor = -R[k, pivot_idx]
                     R = row_addition(R, i, k, factor.item())
                     
+                    R[k, pivot_idx] = 0.0 #
     return R
