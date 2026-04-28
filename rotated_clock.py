@@ -59,8 +59,8 @@ def normalize_to_image_coordinate_homogeneous(logic_vec, image_scale, canvas_cen
     M1 = matrix_multiplication(T_center, S)
     M2 = matrix_multiplication(M0, M1)
     # TODO: Final Transformation V_img_h = (composited matrix) * v_h
-    # Return the first two components of V_img_h
     vec_img_h = matrix_vector_product(M2, v_h)
+    # Return the first two components of V_img_h
     vec_img = vec_img_h[0:2, :]
 
     return vec_img
