@@ -1,105 +1,107 @@
 import torch
-import time # 計時用的!
-import pandas as pd
-from linear_solver import solve_linear_equations
+from linear_solver import (
+    solve_linear_equations, 
+    solve_linear_equations_by_inverse, 
+    test_invertibility, 
+    test_span, 
+    test_linear_dependence
+)
 from matrices_vectors import matrix_vector_product, matrix_sum, scalar_matrix
 
-def run_test(A, b, test_name):
-    print(f"--- Testing: {test_name} ---")
-    x = solve_linear_equations(A, b)
+
+def run_test(matrix_M, vector_b, test_name):
+    print(f"--- Testing Vector: {test_name} ---")
     
-    if x is None:
-        print("Result: No Solution (Inconsistent)\n")
-    else:
-        print("Result: Solution Vector x:")
-        print(x)
-        
-        # TODO: Calculate Error = Ax - b (it should be close to zero)
-        # Hint: Use our custom matrix_vector_product to compute the linear combination: Ax
-        # Hint: Use our custom scalar_matrix and matrix_sum to get the error vector: Ax-b
-        # Hint: Get the L2 Norm (Euclidean distance) of the error vector (you may use torch.norm)
-        # Hint: Report the L2 Norm result
-        Ax = matrix_vector_product(A, x)
-        neg_b = scalar_matrix(-1.0, b)
+    if test_span(matrix_M, vector_b):
+        print("Result: IN SPAN.")
+        # TODO: Solve the solution by using solve_linear_equations_by_inverse
+        x_inverse = solve_linear_equations_by_inverse(matrix_M, vector_b)
+        x_gauss = solve_linear_equations(matrix_M, vector_b)
+        # TODO: If the solution is not None, calculate and print the error: ||x_gauss - x_inverse||, 
+        # where x_gauss is the solution from solve_linear_equations, and x_inverse is the solution 
+        # from solve_linear_equations
+        if x_inverse is not None and x_gauss is not None:
+            # 計算 x_gauss + (-1 * x_inverse)
+            neg_x_inverse = scalar_matrix(-1.0, x_inverse)
+            diff_method = matrix_sum(x_gauss, neg_x_inverse)
+            
+            method_error = torch.norm(diff_method).item()
+            print(f"Error ||x_gauss - x_inverse||: {method_error:.6e}")
+        # TODO: If the solution is None, print a FAIL message:
+        else:
+            print("Inverse Method: FAILED (Matrix is singular/not invertible)")
+
+        # TODO: Perform the Ax-b error check as in previous assignment, print the error
+        # (Should done in HW1, not necessary to explain the codes)
+        x = solve_linear_equations(matrix_M, vector_b)
+        Ax = matrix_vector_product(matrix_M, x)
+        neg_b = scalar_matrix(-1.0, vector_b)
         error_vec = matrix_sum(Ax, neg_b)
-        
         error_norm = torch.norm(error_vec).item()
-        print(f"L2 Norm of Error (||Ax - b||): {error_norm:.6e}\n")
+        print(f"L2 Norm of Error (||Ax - b||): {error_norm:.6e}")
+    else:
+        print("Result: NOT IN SPAN.")
+    print("")
 
-# 1. Define Test Data (4 equations, 4 unknowns)
-# Case 1: Consistent System (Unique solution or Infinite)
-A_consistent = torch.tensor([
-    [1, 2, 1, -1],
-    [3, 2, 4,  4],
-    [4, 4, 3,  4],
-    [2, 0, 1,  5]
+# --- 1. Define Matrix A---
+A = torch.tensor([
+    [1.0, 2.0,  1.0, -1.0],
+    [3.0, 2.0,  4.0,  4.0],
+    [4.0, 4.0,  5.0,  3.0], 
+    [2.0, 0.0,  1.0,  5.0]
 ], dtype=torch.float32)
 
-b_consistent = torch.tensor([[5], [16], [22], [15]], dtype=torch.float32)
-
-# Case 2: Inconsistent System
-# (Row 3 is a multiple of Row 1, but b is not)
-A_inconsistent = torch.tensor([
-    [1, 1, 1, 1],
-    [2, 3, 1, 4],
-    [1, 1, 1, 1], # Same coefficients as row 1
-    [0, 1, 2, 3]
+# --- 2. Define Matrix B ---
+B = torch.tensor([
+    [1.0, 2.0,  1.0, -1.0],
+    [3.0, 5.0,  4.0,  4.0], 
+    [4.0, 4.0,  9.0,  3.0], 
+    [2.0, 0.0,  1.0,  8.0]  
 ], dtype=torch.float32)
 
-b_inconsistent = torch.tensor([[10], [20], [5], [15]], dtype=torch.float32) # b[2] contradicts b[0]
-
-# BONUS: System Robustness & Scalability Challenge
-# Consider to define the following cases and report the results.
-#
-# 1. Minimal Case (2x2 or 3x3):
-#    - Test a simple, manually verifiable system to ensure core logic is sound.
-A_minimal = torch.tensor([
-    [1, 2],
-    [4, 5]
-], dtype=torch.float32)
-b_minimal = torch.tensor([[3], [6]], dtype=torch.float32)
-
-
-# 2. Non-Square (Rectangular) Matrices:
-#    - Underdetermined: "Fat" matrix (e.g., 3x5). Does it handle free variables?
-#    - Overdetermined: "Tall" matrix (e.g., 6x3). Test for both consistent 
-#      and inconsistent cases.
-A_under = torch.tensor([
-    [1, 2, 3, 4, 5],
-    [2, 5, 1, 3, 2],
-    [3, 7, 4, 7, 7]
-], dtype=torch.float32)
-b_under = torch.tensor([[10], [15], [25]], dtype=torch.float32)
-
-A_over_c = torch.tensor([
-    [1, 1, 1],
-    [2, 1, -1],
-    [3, 2, 0],
-    [1, 0, -2],
-    [4, 3, 1]
-], dtype=torch.float32)
-
-b_over_c = torch.tensor([[6], [1], [7], [-5], [13]], dtype=torch.float32)
-b_over_i = torch.tensor([[6], [1], [7], [-5], [99]], dtype=torch.float32)
-
-# 3. Large Scale (100x100+):
-#    - Generate a large matrix A and vector x_true. 
-torch.manual_seed(7)
-A_large = torch.randint(-10, 11, (100, 100), dtype=torch.float32)
-x_true_large = torch.randint(-10, 11, (100, 1)).to(torch.float32)
-b_large = matrix_vector_product(A_large, x_true_large)
-
-# 4. Report Requirements:
-#    - List the dimensions and properties of your test data.
-#    - Provide the final verification error ||Ax - b|| for each case.
+# --- 3. The 6 Test Vectors---
+test_b_vectors = [
+    (torch.tensor([[3.0], [13.0], [16.0], [8.0]]),  "Vector_Alpha"),
+    (torch.tensor([[1.0], [0.0], [0.0], [0.0]]),    "Vector_Beta"),
+    (torch.tensor([[5.0], [18.0], [23.0], [7.0]]),  "Vector_Gamma"),
+    (torch.tensor([[2.0], [1.0], [3.0], [4.0]]),    "Vector_Delta"),
+    (torch.tensor([[0.0], [5.0], [5.0], [1.0]]),    "Vector_Epsilon"),
+    (torch.tensor([[8.0], [4.0], [12.0], [1.0]]),   "Vector_Zeta")
+]
 
 if __name__ == "__main__":
-    run_test(A_consistent, b_consistent, "Consistent Case")
-    run_test(A_inconsistent, b_inconsistent, "Inconsistent Case")
+    print("Linear Algebra Lab: Gaussian vs. Inverse Method")
+    print("=" * 60)
 
-    print("============== BONUS ==============\n")
-    run_test(A_minimal, b_minimal, "Minimal Case: 2x2 Matrix")
-    run_test(A_under, b_under, "Non-Square (Rectangular) Matrices: 3x5 Matrix")
-    run_test(A_over_c, b_over_c, "Non-Square (Rectangular) Matrices: 5x3 Matrix")
-    run_test(A_over_c, b_over_i, "Non-Square (Rectangular) Matrices:5x3 Matrix")
-    run_test(A_large, b_large, "Large Scale Matrix: 100x100 Matrix")
+    # Part 1: Matrix Property Check
+    # TODO: 
+    # 1. Include results in the report.
+    # 2. Provide an analysis of the relation between the linear dependence and invertiblity 
+    print(f"Matrix A (Dependent)  - Is Dependent: {test_linear_dependence(A)}")
+    print(f"Matrix A (Dependent)  - Is Invertible: {test_invertibility(A)}")
+    print("-" * 60)
+    print(f"Matrix B (Independent)- Is Dependent: {test_linear_dependence(B)}")
+    print(f"Matrix B (Independent)- Is Invertible: {test_invertibility(B)}")
+    print("=" * 60)
+
+    # Part 2: Test Scenario 1
+    # TODO:
+    # 1. Include results in the report.
+    # 2. Provide an analysis of the relation between the span and invertibility 
+    # 3. Provide an analysis of the relation between solve_linear_equations and 
+    # solve_linear_equations_by_inverse
+    print("\n[SCENARIO 1] Testing with Dependent Matrix A")
+    for vec, name in test_b_vectors:
+        run_test(A, vec, name)
+    print("-" * 50)
+
+
+    # Part 3: Test Scenario 2
+    # TODO:
+    # 1. Include results in the report.
+    # 2. Provide an analysis of the relation between the span and invertibility 
+    # 3. Provide an analysis of the relation between solve_linear_equations and 
+    # solve_linear_equations_by_inverse
+    print("\n[SCENARIO 2] Testing with Independent Matrix B")
+    for vec, name in test_b_vectors:
+        run_test(B, vec, name)
